@@ -6,7 +6,6 @@ __pycache__/
 *.bin
 *.h5
 *.pth
-# 数据集
 data/
 datasets/
 checkpoints/
