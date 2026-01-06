@@ -18,7 +18,6 @@ from src.utils.dist import get_global_rank
 from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaTokenizer, TrainerCallback
 
 logger = LoggerFactory.create_logger(__name__)
-sys.path.append(os.path.join(os.getcwd(), "~/MTL-LoRA"))
 
 num_labels_list = [2, 2, 2, 2, 3, 2, 2]
 # [cola, sst2, mrpc, qqp, mnli, qnli, rte]
