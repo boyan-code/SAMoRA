@@ -1,0 +1,15 @@
+CUDA_VISIBLE_DEVICES=0 python samora_evaluate.py \
+    --model LLaMA-7B \
+    --adapter samora \
+    --dataset social_i_qa \
+    --base_model 'your_base_model_path/Llama-3.1-8B-Instruct' \
+    --lora_target_modules '["q_proj", "k_proj", "v_proj", "o_proj"]' \
+    --batch_size 32 \
+    --lora_r 8 \
+    --lora_alpha 16 \
+    --lambda_num 9 \
+    --num_B 3 \
+    --temperature 0.8 \
+    --diagonal_format True \
+    --tunable_scaler False \
+    --lora_weights  your_lora_weights_path |tee -a your_output_path \

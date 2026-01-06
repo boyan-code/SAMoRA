@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.log
+*.pt
+*.ckpt
+*.bin
+*.h5
+*.pth
+# 数据集
+data/
+datasets/
+checkpoints/
+logs/
