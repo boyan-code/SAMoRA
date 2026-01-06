@@ -20,7 +20,6 @@ from transformers import (
     set_seed
 )
 
-sys.path.append(os.path.join(os.getcwd(), "~/MTL-LoRA"))
 
 if torch.cuda.is_available():
     device = "cuda"
