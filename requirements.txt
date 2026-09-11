@@ -1,0 +1,11 @@
+torch>=2.1
+transformers>=4.51
+datasets>=2.19
+deepspeed>=0.14
+accelerate>=0.30
+numpy
+tqdm
+sentencepiece
+tensorboard
+# optional experiment tracking
+wandb

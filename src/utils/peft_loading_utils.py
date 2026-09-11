@@ -5,27 +5,13 @@ from typing import Any, Dict, List, Tuple
 import torch
 import torch.nn as nn
 
-from ..adapter import (
-    DoRALinear,
-    SALinear,
-    HydraLoRALinear,
-    LoRALinear,
-    MMOELoraLinear,
-    MultiLoRALinear,
-    mLoRALinear,
-    mLoRAMergedLinear,
-)
+from ..adapter import DoRALinear, LoRALinear, SALinear
 from .dist import get_global_rank
 
 ADAPTER_MAPPING = {
-    "mlora": mLoRALinear,
-    "mlora_merged": mLoRAMergedLinear,
-    "multilora": MultiLoRALinear,
-    "moelora": MMOELoraLinear,
     "dora": DoRALinear,
     "lora": LoRALinear,
     "samora": SALinear,
-    "hydralora": HydraLoRALinear,
 }
 
 
@@ -64,9 +50,9 @@ def save_pretrain(
     state_dict = model.state_dict()
     if get_global_rank() == 0:
         return_dict = get_lora_param_maybe_zero_3(state_dict.items(), valid_keys=prefix)
-        output_dit = os.path.join(output_dir, "checkpoint")
-        os.makedirs(output_dit, exist_ok=True)
-        path = os.path.join(output_dit, f"final_checkpoint.pt")
+        output_dir = os.path.join(output_dir, "checkpoint")
+        os.makedirs(output_dir, exist_ok=True)
+        path = os.path.join(output_dir, "final_checkpoint.pt")
         torch.save(return_dict, path)
         print(f"Model saved to {path}")
 

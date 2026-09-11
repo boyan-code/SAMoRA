@@ -1,4 +1,18 @@
 import argparse
+
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    if v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    raise argparse.ArgumentTypeError(f"Boolean value expected, got {v!r}")
+
+
+SAMORA_ALIASES = ("samora", "laser", "homelora")
+
 import ast
 import copy
 import json
@@ -60,7 +74,7 @@ def main():
         if attention_mask is not None:
             attention_mask = attention_mask.to(device)
 
-        if args.adapter in ["mlora", "moelora", "samora", "homelora", "samora"]:
+        if args.adapter in SAMORA_ALIASES:
             lambda_index = task_name_to_id[args.dataset]
             lambda_index = (
                 torch.tensor(lambda_index).repeat(input_ids.shape[0]).to(device)
@@ -74,7 +88,7 @@ def main():
             **kwargs,
         )
         with torch.no_grad():
-            if args.adapter in ["mlora", "moelora", "samora", "homelora", "samora"]:
+            if args.adapter in SAMORA_ALIASES:
                 generation_output = model.generate(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
@@ -226,7 +240,7 @@ def parse_args():
     )
     parser.add_argument(
         "--adapter",
-        choices=["mlora", "moelora", "multilora", "dora", "samora", "homelora", "samora"],
+        choices=["dora", "samora", "homelora", "laser"],
         required=True,
     )
     parser.add_argument("--base_model", required=True)
@@ -240,8 +254,8 @@ def parse_args():
     parser.add_argument("--lambda_num", type=int)
     parser.add_argument("--num_B", type=int)
     parser.add_argument("--temperature", type=float)
-    parser.add_argument("--diagonal_format", type=bool, default=True)
-    parser.add_argument("--tunable_scaler", type=bool, default=False)
+    parser.add_argument("--diagonal_format", type=str2bool, default=True)
+    parser.add_argument("--tunable_scaler", type=str2bool, default=False)
     # multilora
     parser.add_argument("--lora_num", type=int)
     # moelora
@@ -251,19 +265,19 @@ def parse_args():
     # dora hyperparams
     parser.add_argument(
         "--merge_weights",
-        type=bool,
+        type=str2bool,
         default=False,
         help="merge weights",
     )
     parser.add_argument(
         "--Wdecompose",
-        type=bool,
+        type=str2bool,
         default=False,
         help="Wdecompose",
     )
     parser.add_argument(
         "--dora_simple",
-        type=bool,
+        type=str2bool,
         default=True,
         help="dora simple",
     )
@@ -306,25 +320,14 @@ def load_model(args) -> tuple:
         elif tokenizer.unk_token is not None:
             tokenizer.pad_token = tokenizer.unk_token
 
-    if config.model_type == "llama" and args.adapter.lower() in [
-        "mlora",
-        "moelora",
-        "samora",
-        "homelora",
-        "samora",
-    ]:
+    if config.model_type == "llama" and args.adapter.lower() in SAMORA_ALIASES:
         model = LlamaForCausalLM.from_pretrained(
             base_model,
             torch_dtype=torch.bfloat16,
             device_map={"": int(os.environ.get("LOCAL_RANK") or 0)},
             trust_remote_code=True,
         )
-    elif config.model_type == "qwen3" and args.adapter.lower() in [
-        "mlora",
-        "moelora",
-        "samora",
-        "homelora",
-    ]:
+    elif config.model_type == "qwen3" and args.adapter.lower() in SAMORA_ALIASES:
         model = Qwen3ForCausalLM.from_pretrained(
             base_model,
             torch_dtype=torch.bfloat16,
@@ -337,38 +340,9 @@ def load_model(args) -> tuple:
             torch_dtype=torch.bfloat16,
             device_map={"": int(os.environ.get("LOCAL_RANK") or 0)},
             trust_remote_code=True,
-        )  # fix zwq
+        )
 
-    if args.adapter.lower() == "mlora":
-        mlora_config = {
-            "type": "mlora",
-            "r": args.lora_r,
-            "lora_alpha": args.lora_alpha,
-            "lora_dropout": args.lora_dropout,
-            "lambda_num": args.lambda_num,
-            "B_num": args.num_B,
-            "B_scale": args.temperature,
-            "diagonal_format": False,
-        }
-    elif args.adapter.lower() == "multilora":
-        mlora_config = {
-            "type": "multilora",
-            "r": args.lora_r,
-            "lora_alpha": args.lora_alpha,
-            "lora_dropout": args.lora_dropout,
-            "lora_num": args.lora_num,
-        }
-    elif args.adapter.lower() == "moelora":
-        mlora_config = {
-            "type": "moelora",
-            "r": args.lora_r,
-            "lora_alpha": args.lora_alpha,
-            "lora_dropout": args.lora_dropout,
-            "expert_num": args.expert_num,
-            "task_num": args.task_num,
-            "task_embedding_dim": args.te_dim,
-        }
-    elif args.adapter.lower() == "dora":
+    if args.adapter.lower() == "dora":
         mlora_config = {
             "type": "dora",
             "r": args.lora_r,
@@ -378,7 +352,7 @@ def load_model(args) -> tuple:
             "Wdecompose": args.Wdecompose,
             "dora_simple": args.dora_simple,
         }
-    elif args.adapter.lower() in ["samora", "homelora", "samora"]:
+    elif args.adapter.lower() in SAMORA_ALIASES:
         mlora_config = {
             "type": "samora",
             "r": args.lora_r,
@@ -390,6 +364,8 @@ def load_model(args) -> tuple:
             "diagonal_format": args.diagonal_format,
             "tunable_scaler": args.tunable_scaler,
         }
+    else:
+        raise ValueError(f"Unsupported adapter type: {args.adapter}")
 
     model = wrap_model(model, args.lora_target_modules, mlora_config)
 

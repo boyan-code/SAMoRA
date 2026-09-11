@@ -13,22 +13,14 @@ from datasets import load_dataset, load_from_disk
 from deepspeed.utils.logging import LoggerFactory
 from src.custom_model import LlamaForCausalLM, Qwen3ForCausalLM
 from src.utils import add_filehandler, save_pretrain, set_no_grad, wrap_model
-from src.utils.peft_loading_utilts import get_lora_param_maybe_zero_3
+from src.utils.peft_loading_utils import get_lora_param_maybe_zero_3
 from src.utils.dist import get_global_rank
 from transformers import AutoModelForCausalLM, AutoTokenizer, LlamaTokenizer, TrainerCallback
 
 logger = LoggerFactory.create_logger(__name__)
 
-# task_name_to_id = {
-#     "boolq": 0,
-#     "piqa": 1,
-#     "social_i_qa": 2,
-#     "hellaswag": 3,
-#     "winogrande": 4,
-#     "ARC-Challenge": 5,
-#     "ARC-Easy": 6,
-#     "openbookqa": 7,
-# }
+# accepted aliases for the SAMoRA adapter
+SAMORA_ALIASES = ("samora", "laser", "homelora")
 
 
 def generate_prompt(data_point):
@@ -56,6 +48,16 @@ def generate_prompt(data_point):
 import argparse
 
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    if v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    raise argparse.ArgumentTypeError(f"Boolean value expected, got {v!r}")
+
+
 def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -79,13 +81,13 @@ def arg_parser():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="./homelora-alpaca",
+        default="./samora-output",
         help="output directory",
     )
     parser.add_argument(
         "--adapter_name",
         type=str,
-        default="homelora",
+        default="samora",
         help="adapter type to use",
     )
     parser.add_argument(
@@ -186,13 +188,13 @@ def arg_parser():
     )
     parser.add_argument(
         "--diagonal_format",
-        type=bool,
+        type=str2bool,
         default=True,
         help="diagonal format for lambda matrices",
     )
     parser.add_argument(
         "--tunable_scaler",
-        type=bool,
+        type=str2bool,
         default=False,
         help="use tunable scaler",
     )
@@ -225,19 +227,19 @@ def arg_parser():
     # dora hyperparams
     parser.add_argument(
         "--merge_weights",
-        type=bool,
+        type=str2bool,
         default=False,
         help="merge weights",
     )
     parser.add_argument(
         "--Wdecompose",
-        type=bool,
+        type=str2bool,
         default=False,
         help="Wdecompose",
     )
     parser.add_argument(
         "--dora_simple",
-        type=bool,
+        type=str2bool,
         default=True,
         help="dora simple",
     )
@@ -280,7 +282,7 @@ def arg_parser():
     )
     parser.add_argument(
         "--train_on_inputs",
-        type=bool,
+        type=str2bool,
         default=False,
         help="train on inputs",
     )
@@ -378,8 +380,8 @@ def train(
     base_model: str = "",
     cache_dir: str = None,  # cache tokenized data
     data_path: str = "yahma/alpaca-cleaned",
-    output_dir: str = "./homelora-alpaca",
-    adapter_name: str = "homelora",
+    output_dir: str = "./samora-output",
+    adapter_name: str = "samora",
     batch_size: int = 128,
     num_epochs: int = 3,
     learning_rate: float = 3e-4,
@@ -434,12 +436,12 @@ def train(
     from transformers import AutoConfig
     config = AutoConfig.from_pretrained(base_model, trust_remote_code=True)
     
-    if config.model_type == "llama" and adapter_name.lower() in ["mlora", "moelora", "samora", "laser", "homelora", "samora"]:
+    if config.model_type == "llama" and adapter_name.lower() in SAMORA_ALIASES:
         model = LlamaForCausalLM.from_pretrained(
             base_model,
             torch_dtype=torch.bfloat16,
         )
-    elif config.model_type == "qwen3" and adapter_name.lower() in ["mlora", "moelora", "samora", "laser", "homelora", "samora"]:
+    elif config.model_type == "qwen3" and adapter_name.lower() in SAMORA_ALIASES:
         model = Qwen3ForCausalLM.from_pretrained(
             base_model,
             torch_dtype=torch.bfloat16,
@@ -476,34 +478,13 @@ def train(
 
     model.enable_input_require_grads()
 
-    if adapter_name.lower() == "mlora":
+    if adapter_name.lower() == "lora":
         mlora_config = {
-            "type": "mlora",
+            "type": "lora",
             "r": lora_r,
             "lora_alpha": lora_alpha,
             "lora_dropout": lora_dropout,
-            "lambda_num": lambda_num,
-            "B_num": num_B,
-            "B_scale": temperature,
-            "diagonal_format": False,
-        }
-    elif adapter_name.lower() == "multilora":
-        mlora_config = {
-            "type": "multilora",
-            "r": lora_r,
-            "lora_alpha": lora_alpha,
-            "lora_dropout": lora_dropout,
-            "lora_num": lora_num,
-        }
-    elif adapter_name.lower() == "moelora":
-        mlora_config = {
-            "type": "moelora",
-            "r": lora_r,
-            "lora_alpha": lora_alpha,
-            "lora_dropout": lora_dropout,
-            "expert_num": expert_num,
-            "task_num": task_num,
-            "task_embedding_dim": te_dim,
+            "merge_weights": merge_weights,
         }
     elif adapter_name.lower() == "dora":
         mlora_config = {
@@ -515,7 +496,7 @@ def train(
             "Wdecompose": Wdecompose,
             "dora_simple": dora_simple,
         }
-    elif adapter_name.lower() in ["samora", "laser", "homelora", "samora"]:
+    elif adapter_name.lower() in SAMORA_ALIASES:
         mlora_config = {
             "type": "samora",
             "r": lora_r,
@@ -527,10 +508,12 @@ def train(
             "diagonal_format": diagonal_format,
             "tunable_scaler": tunable_scaler,
         }
+    else:
+        raise ValueError(f"Unsupported adapter type: {adapter_name}")
 
     model = wrap_model(model, lora_target_modules, mlora_config)
-    
-    if use_svd_init and adapter_name.lower() in ["samora", "laser", "homelora", "samora"]:
+
+    if use_svd_init and adapter_name.lower() in SAMORA_ALIASES:
         logger.info(f"Initializing lora_A and lora_B from SVD results in {svd_path}")
         _init_from_svd(model, svd_path, lora_r, num_B, logger)
     
@@ -576,7 +559,7 @@ def train(
                 user_prompt_len:
             ]  # could be sped up, probably
 
-        if adapter_name.lower() in ["mlora", "moelora", "samora", "laser", "homelora", "samora"]:
+        if adapter_name.lower() in SAMORA_ALIASES:
             # 如果数据中有 task_id，使用它；否则默认为 0
             tokenized_full_prompt["lambda_index"] = data_point.get("task_id", 0)
         return tokenized_full_prompt
