@@ -1,6 +1,6 @@
 # SAMoRA: Semantic-Aware Mixture of LoRA Experts for Task-Adaptive Learning
 
-Official implementation of **SAMoRA** (ACL 2026), a parameter-efficient fine-tuning method that combines a shared low-rank projection with a semantic-aware router over multiple LoRA "B" experts and a task-adaptive gate.
+Official implementation of **SAMoRA** ([Findings of ACL 2026](https://aclanthology.org/2026.findings-acl.1404/)), a parameter-efficient fine-tuning method that combines a shared low-rank projection with a semantic-aware router over multiple LoRA "B" experts and a task-adaptive gate.
 
 ## Method at a glance
 
@@ -106,10 +106,27 @@ Evaluation must be run with the **same adapter hyperparameters** (`--lora_r`, `-
 ## Citation
 
 ```bibtex
-@inproceedings{shi2026samora,
-  title     = {{SAMoRA}: Semantic-Aware Mixture of {LoRA} Experts for Task-Adaptive Learning},
-  author    = {Shi, Boyan and others},
-  booktitle = {Proceedings of the 64th Annual Meeting of the Association for Computational Linguistics (ACL)},
-  year      = {2026}
+@inproceedings{shi-etal-2026-samora,
+    title = "{SAM}o{RA}: Semantic-Aware Mixture of {L}o{RA} Experts for Task-Adaptive Learning",
+    author = "Shi, Boyan  and
+      Chen, Wei  and
+      Zhao, Shuyuan  and
+      Shen, Junfeng  and
+      Guo, Shengnan  and
+      Wang, Shaojiang  and
+      Wan, Huaiyu",
+    editor = "Liakata, Maria  and
+      Moreira, Viviane P.  and
+      Zhang, Jiajun  and
+      Jurgens, David",
+    booktitle = "Findings of the {A}ssociation for {C}omputational {L}inguistics: {ACL} 2026",
+    month = jul,
+    year = "2026",
+    address = "San Diego, California, United States",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2026.findings-acl.1404/",
+    doi = "10.18653/v1/2026.findings-acl.1404",
+    pages = "28173--28188",
+    ISBN = "979-8-89176-395-1"
 }
 ```
